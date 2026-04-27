@@ -88,7 +88,32 @@ export const createProperty = async (
       agentPhone,
       discount,
     } = req.body;
+    
+    const isDraftMode = isDraft === "true";
 
+// Door 1: If there's no name, nobody passes.
+if (!propertyName) {
+   res.status(400).json({
+    success: false,
+    message: "Please enter a property name to save your progress",
+  });
+  return
+}
+
+// Door 2: If it's NOT a draft, check for everything else.
+if (!isDraftMode) {
+  if (!price || !fullAddress) {
+    res.status(400).json({
+      success: false,
+      message: "Please fill out all fields to publish this property",
+    });
+    return
+  }
+}
+
+// If they get past these, the property saves!
+
+   
     // Upload images to Cloudinary
     const imageUrls: string[] = [];
 
@@ -322,6 +347,105 @@ export const deleteProperty = async (
     });
   } catch (error) {
     console.error("Delete property error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// ---- DASHBOARD STATS CONTROLLER ----
+// This function calculates real statistics for the admin dashboard.
+// It compares current counts with last month's counts to calculate percentage change.
+export const getDashboardStats = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Get the current date and time
+    const now = new Date();
+
+    // Get the first day of the current month (e.g. April 1, 2026)
+    // This is used as a dividing line between "this month" and "last month"
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Get the first day of last month (e.g. March 1, 2026)
+    // We use this to count how many properties existed before this month started
+    // the -1 means Create a date for the 1st day of the month before this one in the current year.
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    // ---- TOTAL PROPERTIES ----
+    // Count ALL properties in the database (no filter)
+    const totalProperties = await Property.countDocuments();
+
+    // Count properties that were created BEFORE this month started
+    // DATABASE LOGIC: { $lt: startOfThisMonth }
+    // $lt stands for "Less Than". 
+    // It tells the database: "Only count items where the creation date is EARLIER than the first of this month."
+    // This gives us last month's total so we can compare
+    const lastMonthProperties = await Property.countDocuments({ 
+      createdAt: { $lt: startOfThisMonth } // $lt means "less than" (before this month)
+    });
+
+    // ---- ACTIVE LISTINGS ----
+    // Count properties that are published (not drafts)
+    const activeListings = await Property.countDocuments({ isDraft: false });
+
+    // Count published properties that existed before this month
+    // Uses $lt ("Less Than") to find properties older than the current month
+    const lastMonthActive = await Property.countDocuments({ 
+      isDraft: false, 
+      createdAt: { $lt: startOfThisMonth } 
+    });
+
+    // ---- PENDING PROPERTIES (DRAFTS) ----
+    // Count properties that are saved as drafts (not yet published)
+    const pendingProperties = await Property.countDocuments({ isDraft: true });
+
+    // Count draft properties that existed before this month
+    // Uses $lt ("Less Than") to ignore anything added this month
+    const lastMonthPending = await Property.countDocuments({ 
+      isDraft: true, 
+      createdAt: { $lt: startOfThisMonth } 
+    });
+    // ---- DATABASE OPERATOR CHEAT SHEET ----
+    /*
+       $lt  -> "Less Than"          (Earlier/Smaller than the value)
+       $gt  -> "Greater Than"       (Later/Bigger than the value)
+       $lte -> "Less Than or Equal" (Up to and including the value)
+       $gte -> "Greater Than or Equal" (From this value onwards)
+    */
+
+    // ---- PERCENTAGE CALCULATOR ----
+    // This function calculates the percentage change between current and previous counts
+    // Formula: ((current - previous) / previous) * 100
+    // Example: current = 10, previous = 8 → ((10 - 8) / 8) * 100 = +25%
+    // Example: current = 6, previous = 8 → ((6 - 8) / 8) * 100 = -25%
+    // Special case: if previous is 0 (no data last month), 
+    //   return 100% if there are current items, or 0% if there are none
+    const calcPercent = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return Math.round(((current - previous) / previous) * 100);
+    };
+
+    // ---- SEND RESPONSE ----
+    // Return all stats to the frontend
+    // Each stat includes:
+    //   count  → the current total number
+    //   percent → the percentage change compared to last month (positive = up, negative = down)
+    res.status(200).json({
+      success: true,
+      stats: {
+        totalProperties: { 
+          count: totalProperties, 
+          percent: calcPercent(totalProperties, lastMonthProperties) 
+        },
+        activeListings: { 
+          count: activeListings, 
+          percent: calcPercent(activeListings, lastMonthActive) 
+        },
+        pendingProperties: { 
+          count: pendingProperties, 
+          percent: calcPercent(pendingProperties, lastMonthPending) 
+        },
+      }
+    });
+  } catch (error) {
+
     res.status(500).json({ success: false, message: "Server error" });
   }
 };

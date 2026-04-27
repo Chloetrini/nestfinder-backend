@@ -144,6 +144,7 @@ export const login = async (req: Request, res: Response): Promise<void> =>{
                 success: false,
                 message: "Please verify your email before logging in. Check your inbox"
             })
+            return
          }
         //  compare password
 
@@ -330,14 +331,82 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
 
 
 // GET TOTAL USER COUNT 
-export const getUsersCount = async(req: Request, res:Response): Promise<void> =>{
-    try {
-        const count = await User.countDocuments();
-        res.status(200).json({
-            success: true,
-            count,
-        })
-    } catch (error) {
-        res.status(500).json({success: false, message: "Server error"})
+// ---- GET USERS COUNT WITH PERCENTAGE ----
+// This function returns the total number of registered users
+// AND the percentage change compared to last month
+export const getUsersCount = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Get the current date
+    const now = new Date();
+
+    // Get the first day of the current month
+    // Everything before this date = last month's data
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Count ALL users in the database
+    const count = await User.countDocuments();
+
+    // Count users that registered BEFORE this month
+    // This is used as "last month's count" for comparison
+    const lastMonthCount = await User.countDocuments({ 
+      createdAt: { $lt: startOfThisMonth } // $lt = "less than" = before this month
+    });
+
+    // Calculate percentage change
+    // If there were no users last month and there are now → 100% increase
+    // If there were no users last month and still none → 0%
+    // Otherwise → standard percentage formula
+    const percent = lastMonthCount === 0 
+      ? (count > 0 ? 100 : 0) 
+      : Math.round(((count - lastMonthCount) / lastMonthCount) * 100);
+
+    // Return the total count and percentage change
+    res.status(200).json({ 
+      success: true, 
+      count,    // total number of users
+      percent   // percentage change vs last month (positive = up, negative = down)
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// get all users
+export const getAllUsers = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const users = await User.find();
+
+    res.status(200).json({
+      success: true,
+      users,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// delete a user
+export const deleteUser = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+
+    if (!user) {
+      res.status(404).json({ success: false, message: "User not found" });
+      return;
     }
-}
+
+    res.status(200).json({
+      success: true,
+      message: "User deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete user error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
