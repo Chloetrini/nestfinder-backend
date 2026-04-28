@@ -46,27 +46,24 @@ const PropertySchema = new Schema<IProperty>(
       trim: true,
     },
     price: {
-      type: Number,
-      required: [true, "Price is required"],
+      type: Number
+      
     },
     propertyDescription: {
-      type: String,
-      required: [true, "Description is required"],
+      type: String
     },
     propertyType: {
       type: String,
-      enum: ["Villa", "Duplex", "Apartment", "Residential", "House"],
-      required: [true, "Property type is required"],
+      enum: ["Villa", "Duplex", "Apartment", "Residential", "House"]
     },
     sale: {
       type: String,
-      enum: ["For Sale", "For Rent"],
-      required: [true, "Listing status is required"],
+      enum: ["For Sale", "For Rent"]
     },
     location: {
-      city: { type: String, required: true },
-      state: { type: String, required: true },
-      fullAddress: { type: String, required: true },
+      city: { type: String},
+      state: { type: String},
+      fullAddress: { type: String}
     },
     propertyDetails: {
       bedrooms: { type: Number, default: 0 },

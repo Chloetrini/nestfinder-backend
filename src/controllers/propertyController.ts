@@ -88,29 +88,12 @@ export const createProperty = async (
       agentPhone,
       discount,
     } = req.body;
-    
-    const isDraftMode = isDraft === "true";
+   
 
-// Door 1: If there's no name, nobody passes.
-if (!propertyName) {
-   res.status(400).json({
-    success: false,
-    message: "Please enter a property name to save your progress",
-  });
-  return
+ const existingName = await   Property.findOne({propertyName});
+if(existingName){
+    res.status(400).json({message: "Title already exists"})
 }
-
-// Door 2: If it's NOT a draft, check for everything else.
-if (!isDraftMode) {
-  if (!price || !fullAddress) {
-    res.status(400).json({
-      success: false,
-      message: "Please fill out all fields to publish this property",
-    });
-    return
-  }
-}
-
 // If they get past these, the property saves!
 
    
@@ -231,11 +214,27 @@ export const updateProperty = async (
       discount,
     } = req.body;
 
+
+let existingImages: string[] = [];
+if (req.body.existingImages) {
+  try {
+    // We check if it's already an array or a JSON string
+    existingImages = typeof req.body.existingImages === "string" 
+      ? JSON.parse(req.body.existingImages) 
+      : req.body.existingImages;
+  } catch (e) {
+    existingImages = property.images; 
+  }
+} else {
+  existingImages = property.images; 
+}
+
+
     // Handle new image uploads if provided
-    let imageUrls: string[] = property.images;
+    let newImageUrls: string[] = property.images;
 
     if (req.files && req.files.images) {
-      imageUrls = [];
+      newImageUrls = [];
       const files = Array.isArray(req.files.images)
         ? req.files.images
         : [req.files.images];
@@ -254,10 +253,11 @@ export const updateProperty = async (
               .end(file.data);
           },
         );
-        imageUrls.push(result.secure_url);
+        newImageUrls.push(result.secure_url);
       }
     }
-
+   // 3. MERGE BOTH: Keep the old ones + Add the new ones
+const finalImageUrls = [...existingImages, ...newImageUrls];
     // Parse amenities safely
     let parsedAmenities = property.amenities;
     if (amenities) {
@@ -271,7 +271,7 @@ export const updateProperty = async (
 
     // Build update object — only include fields that were actually sent
     const updateData: Record<string, unknown> = {
-      images: imageUrls,
+      images:finalImageUrls ,
       amenities: parsedAmenities,
     };
 
