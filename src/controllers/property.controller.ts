@@ -2,12 +2,16 @@ import type { Request, Response } from 'express'
 import type { UploadedFile } from 'express-fileupload'
 import Property from '../models/property.model.js'
 import { invalidateCache } from '../services/cache.service.js'
+import { notifySubscribersOfProperty } from '../services/newsletter-notify.js'
 import { parseStringArray, toBool, toNumber, uploadPropertyImages } from '../services/property.service.js'
 import { AppError } from '../utils/app-error.js'
 import tryCatchWrapper from '../utils/try-catch-wrapper.js'
 import { sendSuccess } from '../utils/response-handler.js'
 
 const CACHE_NAMESPACE = 'properties'
+
+// Where the emailed unsubscribe link should point (this API)
+const apiBaseUrl = (req: Request) => `${req.hostname === 'localhost' ? 'http' : 'https'}://${req.get('host')}`
 
 const imageFiles = (req: Request) => req.files?.images as UploadedFile | UploadedFile[] | undefined
 
@@ -69,6 +73,9 @@ export const createProperty = tryCatchWrapper(async (req: Request, res: Response
 
   await invalidateCache(CACHE_NAMESPACE)
 
+  // A published (not draft) property is announced to newsletter subscribers, in the background
+  if (!isDraft) void notifySubscribersOfProperty(property, apiBaseUrl(req))
+
   sendSuccess(res, 201, {
     message: isDraft ? 'Property saved to drafts' : 'Property published successfully',
     property,
@@ -114,6 +121,9 @@ export const updateProperty = tryCatchWrapper(async (req: Request, res: Response
   const updated = await Property.findByIdAndUpdate(req.params.id, { $set: update }, { returnDocument: 'after', runValidators: true }).lean()
 
   await invalidateCache(CACHE_NAMESPACE)
+
+  // A draft that was just published is announced too (editing an already published property is not)
+  if (updated && property.isDraft && !updated.isDraft) void notifySubscribersOfProperty(updated, apiBaseUrl(req))
 
   sendSuccess(res, 200, { message: 'Property updated successfully', property: updated })
 })
