@@ -5,10 +5,13 @@ import {
   getAllPropertiesAdmin,
   getProperties,
   getProperty,
+  setFeatured,
   updateProperty,
 } from '../controllers/property.controller.js'
 import { adminOnly, protect } from '../middlewares/auth.middleware.js'
 import { cacheMiddleware } from '../middlewares/cache.middleware.js'
+import { validateBody } from '../middlewares/schema.middleware.js'
+import { featuredSchema } from '../validators/property.schema.js'
 
 const router = Router()
 
@@ -22,6 +25,7 @@ router.get('/:id', cacheMiddleware('properties', 60), getProperty)
 
 router.post('/', protect, adminOnly, createProperty)
 router.put('/:id', protect, adminOnly, updateProperty)
+router.patch('/:id/featured', protect, adminOnly, validateBody(featuredSchema), setFeatured)
 router.delete('/:id', protect, adminOnly, deleteProperty)
 
 export default router
