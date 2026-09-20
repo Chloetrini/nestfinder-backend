@@ -64,6 +64,7 @@ Public property reads (`GET /api/properties`, `GET /api/properties/:id`) are cac
 | `GET /api/properties`, `GET /api/properties/:id` | Public (cached) |
 | `GET /api/properties/admin/all`; `POST`, `PUT /:id`, `DELETE /:id` on `/api/properties` | Admin |
 | `POST /api/enquiries` | Public (rate limited) |
+| `POST /api/contact` | Public (rate limited, honeypot): saves a Contact-page message and emails the admin |
 | `GET /api/enquiries`; `PUT`, `DELETE /api/enquiries/:id` | Admin |
 | `GET /api/health` (also `/health`) | Public |
 
