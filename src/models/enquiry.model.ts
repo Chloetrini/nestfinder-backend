@@ -43,5 +43,8 @@ const EnquirySchema = new Schema<IEnquiry>(
     {timestamps: true}
 )
 
+EnquirySchema.index({ createdAt: -1 });
+EnquirySchema.index({ propertyId: 1 });
+
 const Enquiry = mongoose.model<IEnquiry>("Enquiry", EnquirySchema);
 export default Enquiry

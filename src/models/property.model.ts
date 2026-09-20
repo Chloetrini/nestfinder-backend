@@ -1,4 +1,4 @@
-import mongoose, {Document, Schema} from "mongoose"
+import mongoose, { Document, Schema } from "mongoose"
 
 
 // PROPERTY MODEL
@@ -92,6 +92,14 @@ const PropertySchema = new Schema<IProperty>(
     timestamps: true,
   }
 );
+
+// Indexes for the queries the app actually runs:
+// public listing (published, newest first), featured, filters and search
+PropertySchema.index({ isDraft: 1, createdAt: -1 });
+PropertySchema.index({ isDraft: 1, isFeatured: 1 });
+PropertySchema.index({ "location.state": 1, "location.city": 1 });
+PropertySchema.index({ propertyType: 1, sale: 1, price: 1 });
+PropertySchema.index({ propertyName: 1 });
 
 const Property = mongoose.model<IProperty>("Property", PropertySchema);
 export default Property;
