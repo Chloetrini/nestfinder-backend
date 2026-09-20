@@ -1,80 +1,91 @@
-import express from "express";
-import dotenv from "dotenv";
-import connectDB from "./config/db";
-import fileUpload from "express-fileupload";
-import authRoutes from "./routes/authRoutes"
-import propertyRoutes from "./routes/propertyRoutes"
-import enquiryRoutes from "./routes/enquiryRoutes"
-import cors from "cors"
-// Load environment variables first
-dotenv.config();
+import compression from 'compression'
+import cors from 'cors'
+import express from 'express'
+import fileUpload from 'express-fileupload'
+import helmet from 'helmet'
+import { connectDB, gracefulShutDown } from './config/database.js'
+import { env } from './config/keys.js'
+import logger from './config/logger.js'
+import { appErrorHandler, createExpressLogger, notFoundRoutes, setupGlobalErrorHandlers } from './middlewares/error.middleware.js'
+import { globalLimiter } from './middlewares/rate-limit.middleware.js'
+import authRoutes from './routes/auth.routes.js'
+import enquiryRoutes from './routes/enquiry.routes.js'
+import propertyRoutes from './routes/property.routes.js'
 
-// Connect to MongoDB
-connectDB();
+setupGlobalErrorHandlers()
 
-const app = express();
+const app = express()
 
-// ============================================================
-// MIDDLEWARE
-// ============================================================
+// Behind Render's proxy: needed for correct client IPs (rate limiting) and https
+app.set('trust proxy', 1)
 
-// CORS — allows frontend to talk to backend
+// ---------- middleware ----------
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }))
+app.use(compression())
+app.use(createExpressLogger())
+
+const allowedOrigins = [
+  env.CLIENT_URL || 'http://localhost:5173',
+  'http://localhost:5173',
+  'https://nestfinder-real-estate-ljlj.vercel.app',
+  ...(env.CORS_ORIGINS ? env.CORS_ORIGINS.split(',').map(o => o.trim()).filter(Boolean) : []),
+]
+
 app.use(
   cors({
-    origin: [
-      process.env.CLIENT_URL || "http://localhost:5173",
-      "https://nestfinder-real-estate-ljlj.vercel.app",
-      "http://localhost:5173",
-    ],
+    origin: allowedOrigins,
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
-);
+)
 
-// Parse JSON
-app.use(express.json());
+app.use(globalLimiter)
+app.use(express.json({ limit: '1mb' }))
+app.use(express.urlencoded({ extended: true, limit: '1mb' }))
 
-// Parse form data
-app.use(express.urlencoded({extended:true}))
-
-
-
-// Handle file uploads — for property images
+// Property images arrive as multipart uploads (kept in memory, sent to Cloudinary)
 app.use(
   fileUpload({
-    useTempFiles:false,
-    limits: { fileSize: 10 * 1024 * 1024 },//10 mb per file
-    abortOnLimit:true
+    useTempFiles: false,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB per file
+    abortOnLimit: true,
   })
-);
+)
 
-// ============================================================
-// ROUTES
-// ============================================================
-app.use("/api/auth",authRoutes)
-app.use("/api/properties",propertyRoutes)
-app.use("/api/enquiries",enquiryRoutes)
+// ---------- routes ----------
+const healthHandler = (_req: express.Request, res: express.Response) => {
+  res.status(200).json({ success: true, message: 'NestFinder Pro API is running' })
+}
+app.get('/api/health', healthHandler)
+app.get('/health', healthHandler)
 
-// Health check — to confirm server nis running
-app.get("/api/health", (_req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "NestFinder Pro API is running",
-  });
-});
+app.use('/api/auth', authRoutes)
+app.use('/api/properties', propertyRoutes)
+app.use('/api/enquiries', enquiryRoutes)
 
+app.use(notFoundRoutes)
+app.use(appErrorHandler)
 
+// ---------- start ----------
+const PORT = Number(env.PORT) || 7200
 
-// ============================================================
-// START SERVER
-// ============================================================
-const PORT = process.env.PORT || 7200;
+// Listen first so the host sees an open port right away; the database connects
+// (and retries) in the background.
+const start = () => {
+  const server = app.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT} (${env.NODE_ENV || 'development'})`)
+  })
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV}`);
-  console.log(`Frontend URL: ${process.env.CLIENT_URL}`);
-});
+  const shutdown = () => {
+    server.close(() => void gracefulShutDown())
+  }
+  process.on('SIGTERM', shutdown)
+  process.on('SIGINT', shutdown)
 
-export default app;
+  void connectDB()
+}
+
+start()
+
+export default app
