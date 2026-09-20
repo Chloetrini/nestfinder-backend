@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "seed:admin": "tsx scripts/seed-admin.ts"
+    "seed:admin": "tsx scripts/seed-admin.ts",
+    "dedupe:images": "tsx scripts/dedupe-property-images.ts"
   },
   "keywords": [],
   "author": "",
