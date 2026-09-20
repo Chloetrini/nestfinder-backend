@@ -9,6 +9,7 @@ import logger from './config/logger.js'
 import { appErrorHandler, createExpressLogger, notFoundRoutes, setupGlobalErrorHandlers } from './middlewares/error.middleware.js'
 import { globalLimiter } from './middlewares/rate-limit.middleware.js'
 import authRoutes from './routes/auth.routes.js'
+import contactRoutes from './routes/contact.routes.js'
 import enquiryRoutes from './routes/enquiry.routes.js'
 import propertyRoutes from './routes/property.routes.js'
 
@@ -63,6 +64,7 @@ app.get('/health', healthHandler)
 app.use('/api/auth', authRoutes)
 app.use('/api/properties', propertyRoutes)
 app.use('/api/enquiries', enquiryRoutes)
+app.use('/api/contact', contactRoutes)
 
 app.use(notFoundRoutes)
 app.use(appErrorHandler)
