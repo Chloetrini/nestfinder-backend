@@ -11,6 +11,7 @@ import { globalLimiter } from './middlewares/rate-limit.middleware.js'
 import authRoutes from './routes/auth.routes.js'
 import contactRoutes from './routes/contact.routes.js'
 import enquiryRoutes from './routes/enquiry.routes.js'
+import newsletterRoutes from './routes/newsletter.routes.js'
 import propertyRoutes from './routes/property.routes.js'
 
 setupGlobalErrorHandlers()
@@ -65,6 +66,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/properties', propertyRoutes)
 app.use('/api/enquiries', enquiryRoutes)
 app.use('/api/contact', contactRoutes)
+app.use('/api/newsletter', newsletterRoutes)
 
 app.use(notFoundRoutes)
 app.use(appErrorHandler)

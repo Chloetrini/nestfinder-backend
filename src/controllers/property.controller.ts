@@ -128,3 +128,15 @@ export const deleteProperty = tryCatchWrapper(async (req: Request, res: Response
 
   sendSuccess(res, 200, { message: 'Property deleted successfully' })
 })
+
+// PATCH /api/properties/:id/featured  (admin): pin or unpin a property on the home page
+export const setFeatured = tryCatchWrapper(async (req: Request, res: Response) => {
+  const property = await Property.findByIdAndUpdate(req.params.id, { isFeatured: req.body.isFeatured }, { returnDocument: 'after' }).lean()
+  if (!property) throw new AppError('Property not found', 404)
+
+  await invalidateCache(CACHE_NAMESPACE)
+  sendSuccess(res, 200, {
+    message: property.isFeatured ? 'Property is now featured' : 'Property removed from featured',
+    property,
+  })
+})
